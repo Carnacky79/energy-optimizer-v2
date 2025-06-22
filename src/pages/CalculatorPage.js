@@ -10,6 +10,9 @@ import { reportsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { generateOptimisticResults } from '../utils/monetization';
 import { usePremiumLimits } from '../hooks/usePremiumLimits';
+import ExitIntentPopup from '../components/ExitIntentPopup';
+import ScarcityBanner from '../components/ScarcityBanner';
+import SavingsWheel from '../components/SavingsWheel';
 
 const styles = {
 	container: {
@@ -69,11 +72,26 @@ const CalculatorPage = () => {
 	const { checkReportLimit, remainingReports } = usePremiumLimits();
 	const [results, setResults] = useState(null);
 	const [saving, setSaving] = useState(false);
+	const [showWheel, setShowWheel] = useState(false);
+	const [wheelShown, setWheelShown] = useState(false);
 
 	const handleCalculate = (formData) => {
 		// Calcolo risultati
 		const calculatedResults = calculateResults(formData);
 		setResults(calculatedResults);
+
+		// Mostra la ruota dopo il primo calcolo se non registrato
+		if (
+			!isAuthenticated &&
+			!wheelShown &&
+			!sessionStorage.getItem('wheelShown')
+		) {
+			setTimeout(() => {
+				setShowWheel(true);
+				setWheelShown(true);
+				sessionStorage.setItem('wheelShown', 'true');
+			}, 2000);
+		}
 	};
 
 	const calculateResults = (formData) => {
@@ -237,6 +255,18 @@ const CalculatorPage = () => {
 
 	return (
 		<div style={styles.container}>
+			{/* Popup e componenti di conversione */}
+			<ExitIntentPopup />
+			{!isAuthenticated && <ScarcityBanner />}
+			{showWheel && (
+				<SavingsWheel
+					onComplete={(discount) => {
+						setShowWheel(false);
+						navigate(`/pricing?discount=${discount}`);
+					}}
+				/>
+			)}
+
 			{/* Hero Section */}
 			<div style={styles.hero}>
 				<h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>

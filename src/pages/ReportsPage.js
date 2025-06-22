@@ -107,6 +107,7 @@ const ReportsPage = () => {
 	const viewReport = (report) => {
 		// Salva il report temporaneamente per la visualizzazione
 		sessionStorage.setItem('currentReport', JSON.stringify(report));
+		// Naviga alla pagina di dettaglio con l'ID del report
 		navigate(`/report/${report.id}`);
 	};
 

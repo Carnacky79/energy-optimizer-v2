@@ -12,6 +12,7 @@ import RegisterPage from './pages/RegisterPage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import PricingPage from './pages/PricingPage';
+import ReportDetailPage from './pages/ReportDetailPage';
 import StorageManager from './utils/storage';
 
 const styles = {
@@ -53,6 +54,7 @@ function App() {
 							<Route path='/register' element={<RegisterPage />} />
 							<Route path='/pricing' element={<PricingPage />} />
 							<Route path='/reports' element={<ReportsPage />} />
+							<Route path='/report/:id' element={<ReportDetailPage />} />
 
 							{/* Protected routes */}
 							<Route

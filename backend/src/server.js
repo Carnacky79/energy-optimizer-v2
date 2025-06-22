@@ -11,6 +11,7 @@ const { sequelize, testConnection } = require('./config/database');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const reportRoutes = require('./routes/reports');
+const analyticsRoutes = require('./routes/analytics');
 
 // Create Express app
 const app = express();
@@ -29,6 +30,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
