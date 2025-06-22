@@ -1,27 +1,113 @@
+// src/pages/ReportsPage.js
+
 import React, { useState, useEffect } from 'react';
-import { FileText, Trash2, Eye, Calendar, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+	FileText,
+	Trash2,
+	Eye,
+	Calendar,
+	TrendingUp,
+	Download,
+	AlertCircle,
+} from 'lucide-react';
+import { reportsAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import StorageManager from '../utils/storage';
 
 const ReportsPage = () => {
+	const navigate = useNavigate();
+	const { isAuthenticated } = useAuth();
 	const [reports, setReports] = useState([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState(null);
+	const [timeRemaining, setTimeRemaining] = useState(null);
 
 	useEffect(() => {
-		loadReports();
-	}, []);
+		if (isAuthenticated) {
+			loadReports();
+		} else {
+			// Se non autenticato, carica dal localStorage
+			loadLocalReports();
+			// Controlla il tempo rimanente
+			updateTimeRemaining();
+		}
+	}, [isAuthenticated]);
 
-	const loadReports = () => {
-		const savedReports = StorageManager.getReports();
-		setReports(
-			savedReports.sort((a, b) => new Date(b.date) - new Date(a.date))
-		);
+	useEffect(() => {
+		// Aggiorna il timer ogni minuto
+		if (!isAuthenticated) {
+			const interval = setInterval(updateTimeRemaining, 60000);
+			return () => clearInterval(interval);
+		}
+	}, [isAuthenticated]);
+
+	const updateTimeRemaining = () => {
+		const remaining = StorageManager.getGuestTimeRemaining();
+		setTimeRemaining(remaining);
 	};
 
-	const deleteReport = (reportId) => {
-		if (window.confirm('Sei sicuro di voler eliminare questo report?')) {
-			const updatedReports = reports.filter((r) => r.id !== reportId);
-			StorageManager.saveReports(updatedReports);
-			setReports(updatedReports);
+	useEffect(() => {
+		if (isAuthenticated) {
+			loadReports();
+		} else {
+			// Se non autenticato, carica dal localStorage
+			loadLocalReports();
 		}
+	}, [isAuthenticated]);
+
+	const loadReports = async () => {
+		try {
+			setLoading(true);
+			setError(null);
+			const response = await reportsAPI.getAll();
+			setReports(response.data.reports);
+		} catch (error) {
+			console.error('Error loading reports:', error);
+			setError('Errore nel caricamento dei report');
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const loadLocalReports = () => {
+		try {
+			// Usa StorageManager invece di accedere direttamente al localStorage
+			const localReports = StorageManager.getReports();
+			setReports(localReports);
+		} catch (error) {
+			console.error('Error loading local reports:', error);
+			setReports([]);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const deleteReport = async (reportId) => {
+		if (!window.confirm('Sei sicuro di voler eliminare questo report?')) {
+			return;
+		}
+
+		try {
+			if (isAuthenticated) {
+				await reportsAPI.delete(reportId);
+				setReports(reports.filter((r) => r.id !== reportId));
+			} else {
+				// Elimina dal localStorage usando StorageManager
+				const updatedReports = reports.filter((r) => r.id !== reportId);
+				StorageManager.saveReports(updatedReports);
+				setReports(updatedReports);
+			}
+		} catch (error) {
+			console.error('Error deleting report:', error);
+			alert("Errore nell'eliminazione del report");
+		}
+	};
+
+	const viewReport = (report) => {
+		// Salva il report temporaneamente per la visualizzazione
+		sessionStorage.setItem('currentReport', JSON.stringify(report));
+		navigate(`/report/${report.id}`);
 	};
 
 	const styles = {
@@ -32,6 +118,21 @@ const ReportsPage = () => {
 		},
 		header: {
 			marginBottom: '2rem',
+		},
+		loading: {
+			textAlign: 'center',
+			padding: '4rem 2rem',
+		},
+		error: {
+			backgroundColor: '#fee2e2',
+			border: '1px solid #fecaca',
+			color: '#dc2626',
+			padding: '1rem',
+			borderRadius: '0.375rem',
+			marginBottom: '1rem',
+			display: 'flex',
+			alignItems: 'center',
+			gap: '0.5rem',
 		},
 		emptyState: {
 			textAlign: 'center',
@@ -76,7 +177,44 @@ const ReportsPage = () => {
 			cursor: 'pointer',
 			transition: 'all 0.2s',
 		},
+		notAuthenticatedBanner: {
+			backgroundColor: '#fef3c7',
+			border: '1px solid #fbbf24',
+			borderRadius: '0.375rem',
+			padding: '1rem',
+			marginBottom: '1rem',
+			display: 'flex',
+			alignItems: 'center',
+			justifyContent: 'space-between',
+		},
 	};
+
+	if (loading) {
+		return (
+			<div style={styles.container}>
+				<div style={styles.loading}>
+					<div
+						style={{
+							border: '4px solid #f3f3f3',
+							borderTop: '4px solid #059669',
+							borderRadius: '50%',
+							width: '40px',
+							height: '40px',
+							animation: 'spin 1s linear infinite',
+							margin: '0 auto 1rem',
+						}}
+					/>
+					<style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+					<p>Caricamento report...</p>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div style={styles.container}>
@@ -89,6 +227,78 @@ const ReportsPage = () => {
 				</p>
 			</div>
 
+			{!isAuthenticated && reports.length > 0 && (
+				<>
+					{timeRemaining && (
+						<div
+							style={{
+								...styles.notAuthenticatedBanner,
+								marginBottom: '1rem',
+								backgroundColor: '#fee2e2',
+								borderColor: '#fecaca',
+							}}
+						>
+							<div
+								style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+							>
+								<AlertCircle size={20} color='#dc2626' />
+								<span style={{ color: '#dc2626' }}>
+									⏰ I tuoi report verranno cancellati tra{' '}
+									<strong>
+										{timeRemaining.hours}h {timeRemaining.minutes}m
+									</strong>
+								</span>
+							</div>
+							<button
+								onClick={() => navigate('/register')}
+								style={{
+									padding: '0.5rem 1rem',
+									backgroundColor: '#dc2626',
+									color: 'white',
+									border: 'none',
+									borderRadius: '0.375rem',
+									cursor: 'pointer',
+									fontWeight: 'bold',
+								}}
+							>
+								Salva Permanentemente
+							</button>
+						</div>
+					)}
+					<div style={styles.notAuthenticatedBanner}>
+						<div
+							style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+						>
+							<AlertCircle size={20} color='#f59e0b' />
+							<span>
+								I tuoi report sono salvati solo localmente. Registrati per
+								salvarli nel cloud!
+							</span>
+						</div>
+						<button
+							onClick={() => navigate('/register')}
+							style={{
+								padding: '0.5rem 1rem',
+								backgroundColor: '#059669',
+								color: 'white',
+								border: 'none',
+								borderRadius: '0.375rem',
+								cursor: 'pointer',
+							}}
+						>
+							Registrati
+						</button>
+					</div>
+				</>
+			)}
+
+			{error && (
+				<div style={styles.error}>
+					<AlertCircle size={20} />
+					<span>{error}</span>
+				</div>
+			)}
+
 			{reports.length === 0 ? (
 				<div style={styles.emptyState}>
 					<FileText
@@ -100,19 +310,21 @@ const ReportsPage = () => {
 					<p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
 						Completa una valutazione energetica per salvare il tuo primo report
 					</p>
-					<a
-						href='/'
+					<button
+						onClick={() => navigate('/')}
 						style={{
 							display: 'inline-block',
 							padding: '0.75rem 1.5rem',
 							backgroundColor: '#059669',
 							color: 'white',
+							border: 'none',
 							borderRadius: '0.375rem',
 							textDecoration: 'none',
+							cursor: 'pointer',
 						}}
 					>
 						Inizia Valutazione
-					</a>
+					</button>
 				</div>
 			) : (
 				<div>
@@ -130,8 +342,10 @@ const ReportsPage = () => {
 							<div style={styles.reportHeader}>
 								<div>
 									<h3 style={{ marginBottom: '0.25rem' }}>
-										Report del{' '}
-										{new Date(report.date).toLocaleDateString('it-IT')}
+										{report.title ||
+											`Report del ${new Date(
+												report.createdAt || report.date
+											).toLocaleDateString('it-IT')}`}
 									</h3>
 									<div
 										style={{
@@ -149,10 +363,16 @@ const ReportsPage = () => {
 											}}
 										>
 											<Calendar size={16} />
-											{new Date(report.date).toLocaleTimeString('it-IT', {
-												hour: '2-digit',
-												minute: '2-digit',
-											})}
+											{new Date(report.createdAt || report.date).toLocaleString(
+												'it-IT',
+												{
+													day: '2-digit',
+													month: '2-digit',
+													year: 'numeric',
+													hour: '2-digit',
+													minute: '2-digit',
+												}
+											)}
 										</span>
 										<span
 											style={{
@@ -162,12 +382,15 @@ const ReportsPage = () => {
 											}}
 										>
 											<TrendingUp size={16} />
-											Livello: {report.results.efficiencyLevel.level}
+											Livello:{' '}
+											{report.efficiencyLevel ||
+												report.results?.efficiencyLevel?.level}
 										</span>
 									</div>
 								</div>
 								<div style={styles.actions}>
 									<button
+										onClick={() => viewReport(report)}
 										style={styles.actionButton}
 										title='Visualizza dettagli'
 										onMouseOver={(e) =>
@@ -179,6 +402,21 @@ const ReportsPage = () => {
 									>
 										<Eye size={20} />
 									</button>
+									{report.pdfUrl && (
+										<button
+											onClick={() => window.open(report.pdfUrl, '_blank')}
+											style={styles.actionButton}
+											title='Scarica PDF'
+											onMouseOver={(e) =>
+												(e.currentTarget.style.backgroundColor = '#f3f4f6')
+											}
+											onMouseOut={(e) =>
+												(e.currentTarget.style.backgroundColor = 'transparent')
+											}
+										>
+											<Download size={20} />
+										</button>
+									)}
 									<button
 										onClick={() => deleteReport(report.id)}
 										style={styles.actionButton}
@@ -209,7 +447,7 @@ const ReportsPage = () => {
 										Consumo mensile
 									</p>
 									<p style={{ fontWeight: 'bold' }}>
-										{report.formData.consumption} kWh
+										{report.consumption || report.formData?.consumption} kWh
 									</p>
 								</div>
 								<div style={styles.metricCard}>
@@ -223,7 +461,7 @@ const ReportsPage = () => {
 										Superficie
 									</p>
 									<p style={{ fontWeight: 'bold' }}>
-										{report.formData.area} m²
+										{report.area || report.formData?.area} m²
 									</p>
 								</div>
 								<div style={styles.metricCard}>
@@ -237,7 +475,12 @@ const ReportsPage = () => {
 										Risparmio annuale
 									</p>
 									<p style={{ fontWeight: 'bold', color: '#059669' }}>
-										€{report.results.savingsPotential.annualSavings.toFixed(0)}
+										€
+										{parseFloat(
+											report.annualSavings ||
+												report.results?.savingsPotential?.annualSavings ||
+												0
+										).toFixed(0)}
 									</p>
 								</div>
 								<div style={styles.metricCard}>
@@ -251,7 +494,10 @@ const ReportsPage = () => {
 										ROI stimato
 									</p>
 									<p style={{ fontWeight: 'bold' }}>
-										{report.results.roi.toFixed(1)} anni
+										{parseFloat(report.roi || report.results?.roi || 0).toFixed(
+											1
+										)}{' '}
+										anni
 									</p>
 								</div>
 							</div>

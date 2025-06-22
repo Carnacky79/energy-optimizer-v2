@@ -1,15 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const Report = require('../models/Report');
-const User = require('../models/User');
+const { Report, User } = require('../models');
 const authMiddleware = require('../middleware/auth');
 
 // Get all reports for authenticated user
 router.get('/', authMiddleware, async (req, res) => {
 	try {
-		const reports = await Report.find({ user: req.userId })
-			.sort({ createdAt: -1 })
-			.limit(50);
+		const reports = await Report.findAll({
+			where: { userId: req.userId },
+			order: [['createdAt', 'DESC']],
+			limit: 50,
+		});
 
 		res.json({ reports });
 	} catch (error) {
@@ -23,20 +24,22 @@ router.post('/', authMiddleware, async (req, res) => {
 	try {
 		const reportData = {
 			...req.body,
-			user: req.userId,
+			userId: req.userId,
 		};
 
-		const report = new Report(reportData);
+		// Calculate efficiency
+		const tempReport = Report.build(reportData);
+		const efficiency = tempReport.calculateEfficiency();
 
-		// Calculate efficiency if not provided
-		if (!report.results.efficiencyLevel) {
-			report.results.efficiencyLevel = report.calculateEfficiency();
-		}
+		reportData.efficiencyLevel = efficiency.level;
+		reportData.efficiencyScore = efficiency.score;
+		reportData.efficiencyColor = efficiency.color;
+		reportData.efficiencyFactor = efficiency.factor;
 
-		await report.save();
+		const report = await Report.create(reportData);
 
 		// Update user stats
-		const user = await User.findById(req.userId);
+		const user = await User.findByPk(req.userId);
 		await user.updateStats(report);
 
 		res.status(201).json({
@@ -53,8 +56,10 @@ router.post('/', authMiddleware, async (req, res) => {
 router.get('/:id', authMiddleware, async (req, res) => {
 	try {
 		const report = await Report.findOne({
-			_id: req.params.id,
-			user: req.userId,
+			where: {
+				id: req.params.id,
+				userId: req.userId,
+			},
 		});
 
 		if (!report) {
@@ -71,15 +76,18 @@ router.get('/:id', authMiddleware, async (req, res) => {
 // Update report
 router.put('/:id', authMiddleware, async (req, res) => {
 	try {
-		const report = await Report.findOneAndUpdate(
-			{ _id: req.params.id, user: req.userId },
-			req.body,
-			{ new: true, runValidators: true }
-		);
+		const report = await Report.findOne({
+			where: {
+				id: req.params.id,
+				userId: req.userId,
+			},
+		});
 
 		if (!report) {
 			return res.status(404).json({ message: 'Report non trovato' });
 		}
+
+		await report.update(req.body);
 
 		res.json({
 			message: 'Report aggiornato con successo',
@@ -94,12 +102,14 @@ router.put('/:id', authMiddleware, async (req, res) => {
 // Delete report
 router.delete('/:id', authMiddleware, async (req, res) => {
 	try {
-		const report = await Report.findOneAndDelete({
-			_id: req.params.id,
-			user: req.userId,
+		const result = await Report.destroy({
+			where: {
+				id: req.params.id,
+				userId: req.userId,
+			},
 		});
 
-		if (!report) {
+		if (!result) {
 			return res.status(404).json({ message: 'Report non trovato' });
 		}
 

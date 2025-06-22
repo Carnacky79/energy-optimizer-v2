@@ -6,6 +6,10 @@ import { PiggyBank, Leaf, Award, FileText, Download } from 'lucide-react';
 import CalculatorForm from '../components/Calculator/CalculatorForm';
 import ResultsDisplay from '../components/Calculator/ResultsDisplay';
 import StorageManager from '../utils/storage';
+import { reportsAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import { generateOptimisticResults } from '../utils/monetization';
+import { usePremiumLimits } from '../hooks/usePremiumLimits';
 
 const styles = {
 	container: {
@@ -61,7 +65,10 @@ const styles = {
 
 const CalculatorPage = () => {
 	const navigate = useNavigate();
+	const { isAuthenticated } = useAuth();
+	const { checkReportLimit, remainingReports } = usePremiumLimits();
 	const [results, setResults] = useState(null);
+	const [saving, setSaving] = useState(false);
 
 	const handleCalculate = (formData) => {
 		// Calcolo risultati
@@ -70,27 +77,29 @@ const CalculatorPage = () => {
 	};
 
 	const calculateResults = (formData) => {
+		// Usa i risultati ottimistici per aumentare le conversioni
+		const optimisticData = generateOptimisticResults(formData);
+
 		const monthlyConsumption = parseFloat(formData.consumption);
 		const monthlyBill = parseFloat(formData.bill);
 		const area = parseFloat(formData.area);
 
 		const efficiencyLevel = calculateEfficiencyLevel(monthlyConsumption, area);
-		const savingsPotential = calculateSavingsPotential(
-			monthlyBill,
-			area,
-			efficiencyLevel.factor
-		);
-		const investment = area * 35;
-		const roi = investment / (savingsPotential.annualSavings || 1);
-		const co2Savings = monthlyConsumption * 0.5 * 12;
+
+		// Usa i dati ottimistici invece dei calcoli reali
+		const savingsPotential = {
+			monthlySavings: optimisticData.annualSavings / 12,
+			annualSavings: optimisticData.annualSavings,
+			percentage: optimisticData.savingsPercentage,
+		};
 
 		return {
 			formData,
 			efficiencyLevel,
 			savingsPotential,
-			investment,
-			roi,
-			co2Savings,
+			investment: optimisticData.investment,
+			roi: parseFloat(optimisticData.roi),
+			co2Savings: optimisticData.co2Savings,
 			tips: generateTips(efficiencyLevel.score),
 		};
 	};
@@ -147,33 +156,83 @@ const CalculatorPage = () => {
 		return tips;
 	};
 
-	const saveReport = () => {
+	const saveReport = async () => {
 		if (!results) return;
 
-		const report = {
-			id: Date.now(),
-			date: new Date().toISOString(),
-			formData: results.formData,
-			results: {
-				efficiencyLevel: results.efficiencyLevel,
-				savingsPotential: results.savingsPotential,
-				investment: results.investment,
-				roi: results.roi,
-				co2Savings: results.co2Savings,
-			},
-		};
+		// Controlla i limiti prima di salvare
+		if (!checkReportLimit()) {
+			return;
+		}
 
-		// Recupera report esistenti
-		const existingReports = StorageManager.getReports();
+		setSaving(true);
 
-		// Aggiungi nuovo report
-		const updatedReports = [...existingReports, report];
+		try {
+			if (isAuthenticated) {
+				// Salva nel database tramite API
+				const reportData = {
+					title: `Report del ${new Date().toLocaleDateString('it-IT')}`,
+					// Form data
+					consumption: parseFloat(results.formData.consumption),
+					bill: parseFloat(results.formData.bill),
+					area: parseFloat(results.formData.area),
+					heatingType: results.formData.heatingType,
+					buildingType: results.formData.buildingType,
+					occupants: results.formData.occupants
+						? parseInt(results.formData.occupants)
+						: null,
+					usageTime: results.formData.usageTime,
+					// Results
+					efficiencyLevel: results.efficiencyLevel.level,
+					efficiencyScore: results.efficiencyLevel.score,
+					efficiencyColor: results.efficiencyLevel.color,
+					efficiencyFactor: results.efficiencyLevel.factor,
+					monthlySavings: results.savingsPotential.monthlySavings,
+					annualSavings: results.savingsPotential.annualSavings,
+					savingsPercentage: results.savingsPotential.percentage,
+					investment: results.investment,
+					roi: results.roi,
+					co2Savings: results.co2Savings,
+					recommendations: results.tips,
+				};
 
-		// Salva (con scadenza se non registrato)
-		StorageManager.saveReports(updatedReports);
+				await reportsAPI.create(reportData);
+				alert('Report salvato con successo nel tuo account!');
+			} else {
+				// Salva localmente per utenti non autenticati
+				const report = {
+					id: Date.now(),
+					date: new Date().toISOString(),
+					formData: results.formData,
+					results: {
+						efficiencyLevel: results.efficiencyLevel,
+						savingsPotential: results.savingsPotential,
+						investment: results.investment,
+						roi: results.roi,
+						co2Savings: results.co2Savings,
+					},
+				};
 
-		alert('Report salvato con successo!');
-		navigate('/reports');
+				// Recupera report esistenti
+				const existingReports = StorageManager.getReports();
+
+				// Aggiungi nuovo report
+				const updatedReports = [...existingReports, report];
+
+				// Salva (con scadenza se non registrato)
+				StorageManager.saveReports(updatedReports);
+
+				alert(
+					'Report salvato localmente! Registrati per salvarlo permanentemente.'
+				);
+			}
+
+			navigate('/reports');
+		} catch (error) {
+			console.error('Error saving report:', error);
+			alert('Errore nel salvataggio del report. Riprova.');
+		} finally {
+			setSaving(false);
+		}
 	};
 
 	return (
@@ -187,6 +246,35 @@ const CalculatorPage = () => {
 					Scopri quanto puoi risparmiare con semplici interventi di
 					efficientamento
 				</p>
+				{!isAuthenticated && remainingReports === 0 && (
+					<div
+						style={{
+							backgroundColor: 'rgba(255,255,255,0.2)',
+							borderRadius: '0.5rem',
+							padding: '1rem',
+							marginBottom: '1rem',
+						}}
+					>
+						<p style={{ fontWeight: 'bold' }}>
+							⚠️ Hai esaurito i report gratuiti!
+							<button
+								onClick={() => navigate('/pricing')}
+								style={{
+									marginLeft: '1rem',
+									padding: '0.5rem 1rem',
+									backgroundColor: 'white',
+									color: '#059669',
+									border: 'none',
+									borderRadius: '0.375rem',
+									cursor: 'pointer',
+									fontWeight: 'bold',
+								}}
+							>
+								Passa a Premium
+							</button>
+						</p>
+					</div>
+				)}
 				<div style={styles.heroGrid}>
 					<div style={styles.heroCard}>
 						<PiggyBank size={32} style={{ marginBottom: '0.5rem' }} />
@@ -223,10 +311,19 @@ const CalculatorPage = () => {
 					<div style={styles.actionButtons}>
 						<button
 							onClick={saveReport}
-							style={{ ...styles.button, ...styles.buttonPrimary }}
+							style={{
+								...styles.button,
+								...styles.buttonPrimary,
+								...(saving
+									? { backgroundColor: '#9ca3af', cursor: 'not-allowed' }
+									: {}),
+							}}
+							disabled={saving}
 							onMouseOver={(e) => {
-								e.currentTarget.style.transform = 'translateY(-1px)';
-								e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+								if (!saving) {
+									e.currentTarget.style.transform = 'translateY(-1px)';
+									e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+								}
 							}}
 							onMouseOut={(e) => {
 								e.currentTarget.style.transform = 'translateY(0)';
@@ -234,18 +331,62 @@ const CalculatorPage = () => {
 							}}
 						>
 							<FileText size={20} />
-							Salva Report
+							{saving ? 'Salvataggio...' : 'Salva Report'}
 						</button>
 						<button
-							onClick={() =>
-								alert('Funzionalità PDF disponibile per utenti registrati')
-							}
+							onClick={() => {
+								if (isAuthenticated) {
+									alert(
+										'Funzionalità PDF disponibile a breve per utenti registrati'
+									);
+								} else {
+									alert('Registrati per scaricare i report in PDF');
+									navigate('/register');
+								}
+							}}
 							style={{ ...styles.button, ...styles.buttonSecondary }}
 						>
 							<Download size={20} />
 							Scarica PDF
 						</button>
 					</div>
+
+					{/* Premium Upsell Banner */}
+					{!isAuthenticated && (
+						<div
+							style={{
+								background: 'linear-gradient(to right, #f59e0b, #10b981)',
+								borderRadius: '0.5rem',
+								padding: '2rem',
+								marginTop: '2rem',
+								color: 'white',
+								textAlign: 'center',
+							}}
+						>
+							<h3 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
+								🎯 Sblocca il Tuo Pieno Potenziale di Risparmio!
+							</h3>
+							<p style={{ marginBottom: '1.5rem', fontSize: '1.125rem' }}>
+								Il piano Premium include analisi dettagliate, piani
+								personalizzati e supporto esperto
+							</p>
+							<button
+								onClick={() => navigate('/pricing')}
+								style={{
+									backgroundColor: 'white',
+									color: '#f59e0b',
+									padding: '0.75rem 2rem',
+									border: 'none',
+									borderRadius: '0.375rem',
+									fontSize: '1.125rem',
+									fontWeight: 'bold',
+									cursor: 'pointer',
+								}}
+							>
+								Scopri Premium →
+							</button>
+						</div>
+					)}
 				</>
 			)}
 		</div>

@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const { User } = require('../models');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 
@@ -21,7 +21,7 @@ exports.register = async (req, res) => {
 		const { name, email, password } = req.body;
 
 		// Check if user already exists
-		const existingUser = await User.findOne({ email });
+		const existingUser = await User.findOne({ where: { email } });
 		if (existingUser) {
 			return res.status(400).json({
 				message: 'Un utente con questa email esiste già',
@@ -29,16 +29,14 @@ exports.register = async (req, res) => {
 		}
 
 		// Create new user
-		const user = new User({
+		const user = await User.create({
 			name,
 			email,
 			password,
 		});
 
-		await user.save();
-
 		// Generate token
-		const token = generateToken(user._id);
+		const token = generateToken(user.id);
 
 		res.status(201).json({
 			message: 'Registrazione completata con successo',
@@ -60,7 +58,7 @@ exports.login = async (req, res) => {
 		const { email, password } = req.body;
 
 		// Find user by email
-		const user = await User.findOne({ email });
+		const user = await User.findOne({ where: { email } });
 		if (!user) {
 			return res.status(401).json({
 				message: 'Email o password non validi',
@@ -87,7 +85,7 @@ exports.login = async (req, res) => {
 		await user.save();
 
 		// Generate token
-		const token = generateToken(user._id);
+		const token = generateToken(user.id);
 
 		res.json({
 			message: 'Login effettuato con successo',
@@ -106,7 +104,7 @@ exports.login = async (req, res) => {
 // Get current user
 exports.getMe = async (req, res) => {
 	try {
-		const user = await User.findById(req.userId);
+		const user = await User.findByPk(req.userId);
 		if (!user) {
 			return res.status(404).json({ message: 'Utente non trovato' });
 		}
@@ -124,7 +122,15 @@ exports.getMe = async (req, res) => {
 exports.updateProfile = async (req, res) => {
 	try {
 		const updates = req.body;
-		const allowedUpdates = ['name', 'profile', 'preferences'];
+		const allowedUpdates = [
+			'name',
+			'company',
+			'phone',
+			'street',
+			'city',
+			'province',
+			'postalCode',
+		];
 
 		// Filter only allowed fields
 		const filteredUpdates = {};
@@ -134,14 +140,13 @@ exports.updateProfile = async (req, res) => {
 			}
 		});
 
-		const user = await User.findByIdAndUpdate(req.userId, filteredUpdates, {
-			new: true,
-			runValidators: true,
-		});
-
+		const user = await User.findByPk(req.userId);
 		if (!user) {
 			return res.status(404).json({ message: 'Utente non trovato' });
 		}
+
+		// Update user
+		await user.update(filteredUpdates);
 
 		res.json({
 			message: 'Profilo aggiornato con successo',
@@ -160,7 +165,7 @@ exports.changePassword = async (req, res) => {
 	try {
 		const { currentPassword, newPassword } = req.body;
 
-		const user = await User.findById(req.userId);
+		const user = await User.findByPk(req.userId);
 		if (!user) {
 			return res.status(404).json({ message: 'Utente non trovato' });
 		}

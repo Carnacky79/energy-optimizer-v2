@@ -1,165 +1,180 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+// backend/src/models/User.js
 
-const userSchema = new mongoose.Schema({
-	name: {
-		type: String,
-		required: [true, 'Nome richiesto'],
-		trim: true,
-	},
-	email: {
-		type: String,
-		required: [true, 'Email richiesta'],
-		unique: true,
-		lowercase: true,
-		trim: true,
-		match: [/^\S+@\S+\.\S+$/, 'Email non valida'],
-	},
-	password: {
-		type: String,
-		required: [true, 'Password richiesta'],
-		minlength: [8, 'La password deve essere di almeno 8 caratteri'],
-	},
-	role: {
-		type: String,
-		enum: ['user', 'premium', 'admin', 'consultant'],
-		default: 'user',
-	},
-	subscription: {
-		type: {
-			plan: {
-				type: String,
-				enum: ['free', 'basic', 'premium', 'business'],
-				default: 'free',
-			},
-			startDate: Date,
-			endDate: Date,
-			autoRenew: {
-				type: Boolean,
-				default: false,
+const { DataTypes } = require('sequelize');
+const bcrypt = require('bcryptjs');
+const { sequelize } = require('../config/database');
+
+const User = sequelize.define(
+	'User',
+	{
+		id: {
+			type: DataTypes.INTEGER,
+			primaryKey: true,
+			autoIncrement: true,
+		},
+		name: {
+			type: DataTypes.STRING,
+			allowNull: false,
+			validate: {
+				notEmpty: { msg: 'Nome richiesto' },
 			},
 		},
-		default: {
-			plan: 'free',
-		},
-	},
-	profile: {
-		company: String,
-		phone: String,
-		address: {
-			street: String,
-			city: String,
-			province: String,
-			postalCode: String,
-			country: {
-				type: String,
-				default: 'IT',
+		email: {
+			type: DataTypes.STRING,
+			allowNull: false,
+			unique: true,
+			validate: {
+				isEmail: { msg: 'Email non valida' },
 			},
 		},
-	},
-	preferences: {
-		notifications: {
-			email: {
-				type: Boolean,
-				default: true,
+		password: {
+			type: DataTypes.STRING,
+			allowNull: false,
+			validate: {
+				len: {
+					args: [8, 255],
+					msg: 'La password deve essere di almeno 8 caratteri',
+				},
 			},
-			reports: {
-				type: Boolean,
-				default: true,
-			},
-			tips: {
-				type: Boolean,
-				default: true,
-			},
+		},
+		role: {
+			type: DataTypes.ENUM('user', 'premium', 'admin', 'consultant'),
+			defaultValue: 'user',
+		},
+		subscriptionPlan: {
+			type: DataTypes.ENUM('free', 'basic', 'premium', 'business'),
+			defaultValue: 'free',
+		},
+		subscriptionStartDate: {
+			type: DataTypes.DATE,
+		},
+		subscriptionEndDate: {
+			type: DataTypes.DATE,
+		},
+		subscriptionAutoRenew: {
+			type: DataTypes.BOOLEAN,
+			defaultValue: false,
+		},
+		// Profile fields
+		company: {
+			type: DataTypes.STRING,
+		},
+		phone: {
+			type: DataTypes.STRING,
+		},
+		street: {
+			type: DataTypes.STRING,
+		},
+		city: {
+			type: DataTypes.STRING,
+		},
+		province: {
+			type: DataTypes.STRING,
+		},
+		postalCode: {
+			type: DataTypes.STRING,
+		},
+		country: {
+			type: DataTypes.STRING,
+			defaultValue: 'IT',
+		},
+		// Preferences
+		notificationEmail: {
+			type: DataTypes.BOOLEAN,
+			defaultValue: true,
+		},
+		notificationReports: {
+			type: DataTypes.BOOLEAN,
+			defaultValue: true,
+		},
+		notificationTips: {
+			type: DataTypes.BOOLEAN,
+			defaultValue: true,
 		},
 		language: {
-			type: String,
-			default: 'it',
+			type: DataTypes.STRING,
+			defaultValue: 'it',
 		},
-	},
-	stats: {
+		// Stats
 		totalReports: {
-			type: Number,
-			default: 0,
+			type: DataTypes.INTEGER,
+			defaultValue: 0,
 		},
 		totalSavings: {
-			type: Number,
-			default: 0,
+			type: DataTypes.DECIMAL(10, 2),
+			defaultValue: 0,
 		},
 		co2Saved: {
-			type: Number,
-			default: 0,
+			type: DataTypes.DECIMAL(10, 2),
+			defaultValue: 0,
+		},
+		// Status
+		isActive: {
+			type: DataTypes.BOOLEAN,
+			defaultValue: true,
+		},
+		emailVerified: {
+			type: DataTypes.BOOLEAN,
+			defaultValue: false,
+		},
+		emailVerificationToken: {
+			type: DataTypes.STRING,
+		},
+		passwordResetToken: {
+			type: DataTypes.STRING,
+		},
+		passwordResetExpires: {
+			type: DataTypes.DATE,
+		},
+		lastLogin: {
+			type: DataTypes.DATE,
 		},
 	},
-	isActive: {
-		type: Boolean,
-		default: true,
-	},
-	emailVerified: {
-		type: Boolean,
-		default: false,
-	},
-	emailVerificationToken: String,
-	passwordResetToken: String,
-	passwordResetExpires: Date,
-	lastLogin: Date,
-	createdAt: {
-		type: Date,
-		default: Date.now,
-	},
-	updatedAt: {
-		type: Date,
-		default: Date.now,
-	},
-});
-
-// Indexes
-userSchema.index({ email: 1 });
-userSchema.index({ createdAt: -1 });
-
-// Hash password before saving
-userSchema.pre('save', async function (next) {
-	// Only hash if password is modified
-	if (!this.isModified('password')) return next();
-
-	try {
-		const salt = await bcrypt.genSalt(10);
-		this.password = await bcrypt.hash(this.password, salt);
-		next();
-	} catch (error) {
-		next(error);
+	{
+		hooks: {
+			beforeCreate: async (user) => {
+				if (user.password) {
+					const salt = await bcrypt.genSalt(10);
+					user.password = await bcrypt.hash(user.password, salt);
+				}
+			},
+			beforeUpdate: async (user) => {
+				if (user.changed('password')) {
+					const salt = await bcrypt.genSalt(10);
+					user.password = await bcrypt.hash(user.password, salt);
+				}
+			},
+		},
+		indexes: [
+			{
+				unique: true,
+				fields: ['email'],
+			},
+		],
 	}
-});
+);
 
-// Update timestamps
-userSchema.pre('save', function (next) {
-	this.updatedAt = Date.now();
-	next();
-});
-
-// Compare password method
-userSchema.methods.comparePassword = async function (candidatePassword) {
+// Instance methods
+User.prototype.comparePassword = async function (candidatePassword) {
 	return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Remove sensitive data when converting to JSON
-userSchema.methods.toJSON = function () {
-	const user = this.toObject();
-	delete user.password;
-	delete user.emailVerificationToken;
-	delete user.passwordResetToken;
-	delete user.passwordResetExpires;
-	return user;
+User.prototype.toJSON = function () {
+	const values = { ...this.get() };
+	delete values.password;
+	delete values.emailVerificationToken;
+	delete values.passwordResetToken;
+	delete values.passwordResetExpires;
+	return values;
 };
 
-// Update user stats
-userSchema.methods.updateStats = async function (report) {
-	this.stats.totalReports += 1;
-	this.stats.totalSavings += report.results.savingsPotential.annualSavings || 0;
-	this.stats.co2Saved += report.results.co2Savings || 0;
+User.prototype.updateStats = async function (report) {
+	this.totalReports += 1;
+	this.totalSavings =
+		parseFloat(this.totalSavings) + parseFloat(report.annualSavings || 0);
+	this.co2Saved =
+		parseFloat(this.co2Saved) + parseFloat(report.co2Savings || 0);
 	await this.save();
 };
-
-const User = mongoose.model('User', userSchema);
 
 module.exports = User;

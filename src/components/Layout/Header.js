@@ -1,9 +1,10 @@
 // src/components/Layout/Header.js
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Leaf, Clock, AlertCircle, User } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Leaf, Clock, AlertCircle, User, LogOut } from 'lucide-react';
 import StorageManager from '../../utils/storage';
+import { useAuth } from '../../contexts/AuthContext';
 
 const styles = {
 	header: {
@@ -94,14 +95,17 @@ const styles = {
 
 const Header = () => {
 	const location = useLocation();
+	const navigate = useNavigate();
+	const { user, logout, isAuthenticated } = useAuth();
 	const [timeRemaining, setTimeRemaining] = useState(null);
-	const [isRegistered, setIsRegistered] = useState(false);
+	const [showUserMenu, setShowUserMenu] = useState(false);
 
 	useEffect(() => {
 		const checkStatus = () => {
-			setIsRegistered(StorageManager.isUserRegistered());
-			if (!StorageManager.isUserRegistered()) {
+			if (!isAuthenticated && !StorageManager.isUserRegistered()) {
 				setTimeRemaining(StorageManager.getGuestTimeRemaining());
+			} else {
+				setTimeRemaining(null);
 			}
 		};
 
@@ -109,14 +113,14 @@ const Header = () => {
 		const interval = setInterval(checkStatus, 60000); // Aggiorna ogni minuto
 
 		return () => clearInterval(interval);
-	}, []);
+	}, [isAuthenticated]);
 
 	const isActive = (path) => location.pathname === path;
 
 	return (
 		<>
 			{/* Warning Banner per utenti non registrati */}
-			{!isRegistered && timeRemaining && (
+			{!isAuthenticated && timeRemaining && (
 				<div style={styles.warningBanner}>
 					<div style={styles.warningContent}>
 						<div style={styles.warningText}>
@@ -175,26 +179,109 @@ const Header = () => {
 							>
 								Consigli
 							</Link>
+							<Link
+								to='/pricing'
+								style={{
+									...styles.navLink,
+									...(isActive('/pricing') ? styles.navLinkActive : {}),
+									color: '#f59e0b',
+									fontWeight: 'bold',
+								}}
+							>
+								⭐ Premium
+							</Link>
 
-							{isRegistered ? (
+							{isAuthenticated ? (
 								<div style={styles.userMenu}>
-									<button style={styles.userButton}>
+									<button
+										style={styles.userButton}
+										onClick={() => setShowUserMenu(!showUserMenu)}
+									>
 										<User size={20} />
-										<span>Il mio Account</span>
+										<span>{user?.name || 'Account'}</span>
 									</button>
+									{showUserMenu && (
+										<div
+											style={{
+												position: 'absolute',
+												top: '100%',
+												right: 0,
+												marginTop: '0.5rem',
+												backgroundColor: 'white',
+												border: '1px solid #e5e7eb',
+												borderRadius: '0.375rem',
+												boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+												minWidth: '200px',
+												zIndex: 50,
+											}}
+										>
+											<Link
+												to='/profile'
+												style={{
+													display: 'block',
+													padding: '0.75rem 1rem',
+													textDecoration: 'none',
+													color: '#374151',
+													borderBottom: '1px solid #e5e7eb',
+												}}
+												onClick={() => setShowUserMenu(false)}
+											>
+												<User
+													size={16}
+													style={{ display: 'inline', marginRight: '0.5rem' }}
+												/>
+												Il mio profilo
+											</Link>
+											<button
+												onClick={() => {
+													setShowUserMenu(false);
+													logout();
+												}}
+												style={{
+													display: 'block',
+													width: '100%',
+													padding: '0.75rem 1rem',
+													textAlign: 'left',
+													background: 'none',
+													border: 'none',
+													cursor: 'pointer',
+													color: '#374151',
+												}}
+											>
+												<LogOut
+													size={16}
+													style={{ display: 'inline', marginRight: '0.5rem' }}
+												/>
+												Esci
+											</button>
+										</div>
+									)}
 								</div>
 							) : (
-								<Link
-									to='/register'
-									style={{
-										...styles.registerButton,
-										backgroundColor: '#059669',
-										color: 'white',
-										padding: '0.75rem 1.5rem',
-									}}
+								<div
+									style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}
 								>
-									Registrati
-								</Link>
+									<Link
+										to='/login'
+										style={{
+											...styles.navLink,
+											padding: '0.5rem 1rem',
+										}}
+									>
+										Accedi
+									</Link>
+									<Link
+										to='/register'
+										style={{
+											...styles.registerButton,
+											backgroundColor: '#059669',
+											color: 'white',
+											padding: '0.75rem 1.5rem',
+										}}
+									>
+										Registrati
+									</Link>
+								</div>
 							)}
 						</div>
 					</nav>

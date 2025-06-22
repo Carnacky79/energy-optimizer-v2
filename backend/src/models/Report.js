@@ -1,112 +1,121 @@
-const mongoose = require('mongoose');
+// backend/src/models/Report.js
 
-const reportSchema = new mongoose.Schema({
-	user: {
-		type: mongoose.Schema.Types.ObjectId,
-		ref: 'User',
-		required: true,
-	},
-	title: {
-		type: String,
-		default: function () {
-			return `Report del ${new Date().toLocaleDateString('it-IT')}`;
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
+
+const Report = sequelize.define(
+	'Report',
+	{
+		id: {
+			type: DataTypes.INTEGER,
+			primaryKey: true,
+			autoIncrement: true,
 		},
-	},
-	formData: {
+		userId: {
+			type: DataTypes.INTEGER,
+			allowNull: false,
+			references: {
+				model: 'Users',
+				key: 'id',
+			},
+		},
+		title: {
+			type: DataTypes.STRING,
+			defaultValue: function () {
+				return `Report del ${new Date().toLocaleDateString('it-IT')}`;
+			},
+		},
+		// Form data
 		consumption: {
-			type: Number,
-			required: true,
+			type: DataTypes.DECIMAL(10, 2),
+			allowNull: false,
 		},
 		bill: {
-			type: Number,
-			required: true,
+			type: DataTypes.DECIMAL(10, 2),
+			allowNull: false,
 		},
 		area: {
-			type: Number,
-			required: true,
+			type: DataTypes.DECIMAL(10, 2),
+			allowNull: false,
 		},
 		heatingType: {
-			type: String,
-			enum: ['gas', 'elettrico', 'pompa_calore', 'altro'],
-			default: 'gas',
+			type: DataTypes.ENUM('gas', 'elettrico', 'pompa_calore', 'altro'),
+			defaultValue: 'gas',
 		},
 		buildingType: {
-			type: String,
-			enum: ['residenziale', 'ufficio', 'commerciale', 'industriale'],
-			default: 'residenziale',
+			type: DataTypes.ENUM(
+				'residenziale',
+				'ufficio',
+				'commerciale',
+				'industriale'
+			),
+			defaultValue: 'residenziale',
 		},
-		occupants: Number,
-		usageTime: String,
-	},
-	results: {
+		occupants: {
+			type: DataTypes.INTEGER,
+		},
+		usageTime: {
+			type: DataTypes.STRING,
+		},
+		// Results
 		efficiencyLevel: {
-			level: String,
-			score: Number,
-			color: String,
-			factor: Number,
+			type: DataTypes.STRING,
 		},
-		savingsPotential: {
-			monthlySavings: Number,
-			annualSavings: Number,
-			percentage: Number,
+		efficiencyScore: {
+			type: DataTypes.INTEGER,
 		},
-		investment: Number,
-		roi: Number,
-		co2Savings: Number,
+		efficiencyColor: {
+			type: DataTypes.STRING,
+		},
+		efficiencyFactor: {
+			type: DataTypes.DECIMAL(3, 2),
+		},
+		monthlySavings: {
+			type: DataTypes.DECIMAL(10, 2),
+		},
+		annualSavings: {
+			type: DataTypes.DECIMAL(10, 2),
+		},
+		savingsPercentage: {
+			type: DataTypes.INTEGER,
+		},
+		investment: {
+			type: DataTypes.DECIMAL(10, 2),
+		},
+		roi: {
+			type: DataTypes.DECIMAL(5, 2),
+		},
+		co2Savings: {
+			type: DataTypes.DECIMAL(10, 2),
+		},
+		// Additional fields
+		recommendations: {
+			type: DataTypes.JSON,
+			defaultValue: [],
+		},
+		notes: {
+			type: DataTypes.TEXT,
+		},
+		pdfUrl: {
+			type: DataTypes.STRING,
+		},
+		isPublic: {
+			type: DataTypes.BOOLEAN,
+			defaultValue: false,
+		},
 	},
-	recommendations: [
-		{
-			title: String,
-			description: String,
-			savings: String,
-			priority: {
-				type: String,
-				enum: ['alta', 'media', 'bassa'],
+	{
+		indexes: [
+			{
+				fields: ['userId', 'createdAt'],
 			},
-			implemented: {
-				type: Boolean,
-				default: false,
-			},
-		},
-	],
-	notes: String,
-	sharedWith: [
-		{
-			email: String,
-			sharedAt: {
-				type: Date,
-				default: Date.now,
-			},
-		},
-	],
-	pdfUrl: String,
-	isPublic: {
-		type: Boolean,
-		default: false,
-	},
-	createdAt: {
-		type: Date,
-		default: Date.now,
-	},
-	updatedAt: {
-		type: Date,
-		default: Date.now,
-	},
-});
+		],
+	}
+);
 
-// Indexes
-reportSchema.index({ user: 1, createdAt: -1 });
-reportSchema.index({ createdAt: -1 });
-
-// Update timestamps
-reportSchema.pre('save', function (next) {
-	this.updatedAt = Date.now();
-	next();
-});
-
-// Calculate efficiency level
-reportSchema.methods.calculateEfficiency = function () {
-	const consumptionPerArea = this.formData.consumption / this.formData.area;
+// Instance methods
+Report.prototype.calculateEfficiency = function () {
+	const consumptionPerArea = this.consumption / this.area;
 
 	if (consumptionPerArea < 5) {
 		return { level: 'Ottimo', score: 90, color: '#059669', factor: 0.3 };
@@ -120,7 +129,5 @@ reportSchema.methods.calculateEfficiency = function () {
 		return { level: 'Critico', score: 25, color: '#dc2626', factor: 1.0 };
 	}
 };
-
-const Report = mongoose.model('Report', reportSchema);
 
 module.exports = Report;
