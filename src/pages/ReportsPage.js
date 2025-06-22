@@ -383,9 +383,7 @@ const ReportsPage = () => {
 											}}
 										>
 											<TrendingUp size={16} />
-											Livello:{' '}
-											{report.efficiencyLevel ||
-												report.results?.efficiencyLevel?.level}
+											Livello: {report.efficiencyLevel?.level || 'N/A'}
 										</span>
 									</div>
 								</div>

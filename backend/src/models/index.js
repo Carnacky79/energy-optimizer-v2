@@ -3,7 +3,7 @@
 const User = require('./User');
 const Report = require('./Report');
 
-// Define associations
+// Definisci le associazioni
 User.hasMany(Report, {
 	foreignKey: 'userId',
 	as: 'reports',

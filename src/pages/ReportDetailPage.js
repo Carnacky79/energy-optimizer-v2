@@ -276,7 +276,7 @@ const ReportDetailPage = () => {
 			0
 	);
 
-	const efficiencyLevel = report?.results?.efficiencyLevel || 'C';
+	const efficiencyLevel = report?.results?.efficiencyLevel.level || 'C';
 	const recommendations =
 		report?.recommendations || report?.results?.recommendations || [];
 
@@ -536,42 +536,57 @@ const ReportDetailPage = () => {
 			<div style={styles.section}>
 				<h3 style={styles.sectionTitle}>📋 Piano d'Azione Consigliato</h3>
 				<ul style={styles.recommendationList}>
-					{recommendations.length > 0 ? (
+					{recommendations && recommendations.length > 0 ? (
 						recommendations.map((rec, index) => {
-							const priority = typeof rec === 'object' ? rec.priority : null;
-							const savings = typeof rec === 'object' ? rec.savings : null;
+							// Gestisci sia stringhe che oggetti
+							const title =
+								typeof rec === 'string' ? rec : rec.title || rec.action || '';
+							const description =
+								typeof rec === 'object' ? rec.description : '';
+							const savings = typeof rec === 'object' ? rec.savings : '';
+							const priority = typeof rec === 'object' ? rec.priority : 'media';
 
 							return (
 								<li key={index} style={styles.recommendationItem}>
 									<Lightbulb size={20} color='#f59e0b' />
 									<div style={{ flex: 1 }}>
-										<div style={{ marginBottom: '0.25rem' }}>
-											{renderRecommendation(rec)}
+										<div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>
+											{title}
 										</div>
+										{description && (
+											<div
+												style={{
+													fontSize: '0.875rem',
+													color: '#6b7280',
+													marginBottom: '0.25rem',
+												}}
+											>
+												{description}
+											</div>
+										)}
 										<div
 											style={{
 												display: 'flex',
-												gap: '0.5rem',
+												gap: '1rem',
 												alignItems: 'center',
+												flexWrap: 'wrap',
 											}}
 										>
-											{priority && (
-												<span
-													style={{
-														...styles.priorityBadge,
-														backgroundColor:
-															priorityColors[priority]?.bg || '#f3f4f6',
-														color: priorityColors[priority]?.color || '#6b7280',
-													}}
-												>
-													Priorità {priority}
-												</span>
-											)}
+											<span
+												style={{
+													...styles.priorityBadge,
+													backgroundColor:
+														priorityColors[priority]?.bg || '#f3f4f6',
+													color: priorityColors[priority]?.color || '#6b7280',
+												}}
+											>
+												Priorità {priority}
+											</span>
 											{savings && (
 												<span
 													style={{ fontSize: '0.875rem', color: '#10b981' }}
 												>
-													Risparmio: €{savings}/anno
+													Risparmio: {savings}
 												</span>
 											)}
 										</div>
@@ -580,12 +595,12 @@ const ReportDetailPage = () => {
 							);
 						})
 					) : (
-						// Raccomandazioni di default...
+						// Raccomandazioni di default se non ce ne sono
 						<>
 							<li style={styles.recommendationItem}>
 								<Lightbulb size={20} color='#f59e0b' />
 								<div style={{ flex: 1 }}>
-									<div style={{ marginBottom: '0.25rem' }}>
+									<div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>
 										Sostituisci le lampadine con LED
 									</div>
 									<span
@@ -602,7 +617,7 @@ const ReportDetailPage = () => {
 							<li style={styles.recommendationItem}>
 								<Lightbulb size={20} color='#f59e0b' />
 								<div style={{ flex: 1 }}>
-									<div style={{ marginBottom: '0.25rem' }}>
+									<div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>
 										Installa un termostato programmabile
 									</div>
 									<span
@@ -613,23 +628,6 @@ const ReportDetailPage = () => {
 										}}
 									>
 										Priorità Alta
-									</span>
-								</div>
-							</li>
-							<li style={styles.recommendationItem}>
-								<Lightbulb size={20} color='#f59e0b' />
-								<div style={{ flex: 1 }}>
-									<div style={{ marginBottom: '0.25rem' }}>
-										Migliora l'isolamento termico
-									</div>
-									<span
-										style={{
-											...styles.priorityBadge,
-											backgroundColor: '#fed7aa',
-											color: '#ea580c',
-										}}
-									>
-										Priorità Media
 									</span>
 								</div>
 							</li>

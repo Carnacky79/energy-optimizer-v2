@@ -19,6 +19,7 @@ const authMiddleware = (req, res, next) => {
 
 		// Add user ID to request
 		req.userId = decoded.userId;
+		req.user = decoded.user;
 
 		next();
 	} catch (error) {

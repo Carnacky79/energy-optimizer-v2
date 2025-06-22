@@ -66,7 +66,7 @@ const startServer = async () => {
 
 		// Sync database models
 		await sequelize.sync({
-			alter: process.env.NODE_ENV === 'development', // Only alter tables in development
+			//alter: process.env.NODE_ENV === 'development', // Only alter tables in development
 		});
 		console.log('✅ Database synchronized');
 

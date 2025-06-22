@@ -75,8 +75,11 @@ const CalculatorPage = () => {
 	const [showWheel, setShowWheel] = useState(false);
 	const [wheelShown, setWheelShown] = useState(false);
 
+	const [formData, setFormData] = useState(null);
+
 	const handleCalculate = (formData) => {
 		// Calcolo risultati
+		setFormData(formData);
 		const calculatedResults = calculateResults(formData);
 		setResults(calculatedResults);
 
@@ -104,6 +107,10 @@ const CalculatorPage = () => {
 
 		const efficiencyLevel = calculateEfficiencyLevel(monthlyConsumption, area);
 
+		// Calcola CO2
+		const annualConsumption = monthlyConsumption * 12;
+		const co2Savings = (annualConsumption * 0.3 * 0.5) / 1000; // tonnellate
+
 		// Usa i dati ottimistici invece dei calcoli reali
 		const savingsPotential = {
 			monthlySavings: optimisticData.annualSavings / 12,
@@ -118,6 +125,11 @@ const CalculatorPage = () => {
 			investment: optimisticData.investment,
 			roi: parseFloat(optimisticData.roi),
 			co2Savings: optimisticData.co2Savings,
+			environmental: {
+				co2Savings: co2Savings.toFixed(2),
+				treesEquivalent: Math.round(co2Savings * 16),
+				kwhSaved: Math.round(annualConsumption * 0.3),
+			},
 			tips: generateTips(efficiencyLevel.score),
 		};
 	};
@@ -126,14 +138,14 @@ const CalculatorPage = () => {
 		const consumptionPerArea = consumption / area;
 
 		if (consumptionPerArea < 5)
-			return { level: 'Ottimo', score: 90, color: '#059669', factor: 0.3 };
+			return { level: 'A', score: 90, color: '#059669', factor: 0.3 };
 		if (consumptionPerArea < 10)
-			return { level: 'Buono', score: 75, color: '#2563eb', factor: 0.5 };
+			return { level: 'B', score: 75, color: '#2563eb', factor: 0.5 };
 		if (consumptionPerArea < 15)
-			return { level: 'Medio', score: 60, color: '#eab308', factor: 0.7 };
+			return { level: 'C', score: 60, color: '#eab308', factor: 0.7 };
 		if (consumptionPerArea < 20)
-			return { level: 'Scarso', score: 40, color: '#f97316', factor: 0.9 };
-		return { level: 'Critico', score: 25, color: '#dc2626', factor: 1.0 };
+			return { level: 'D', score: 40, color: '#f97316', factor: 0.9 };
+		return { level: 'E', score: 25, color: '#dc2626', factor: 1.0 };
 	};
 
 	const calculateSavingsPotential = (bill, area, factor) => {
@@ -150,25 +162,44 @@ const CalculatorPage = () => {
 
 		if (score < 50) {
 			tips.push({
-				title: 'Illuminazione LED',
-				description: 'Sostituisci tutte le lampade con LED ad alta efficienza',
-				savings: 'Fino al 80% sui consumi di illuminazione',
+				title: 'Sostituisci illuminazione con LED',
+				description:
+					'Sostituisci tutte le lampade tradizionali con LED ad alta efficienza',
+				savings: 'Riduzione del 80% sui consumi di illuminazione',
+				priority: 'alta',
+			});
+			tips.push({
+				title: 'Isolamento termico urgente',
+				description:
+					'Isola tetto e pareti esterne per ridurre drasticamente le dispersioni',
+				savings: 'Riduzione del 40% sui costi di riscaldamento',
 				priority: 'alta',
 			});
 		}
 
+		if (score < 75) {
+			tips.push({
+				title: 'Infissi a doppio vetro',
+				description:
+					'Sostituisci i vecchi infissi con modelli a taglio termico',
+				savings: 'Riduzione del 25% sulle dispersioni termiche',
+				priority: score < 50 ? 'alta' : 'media',
+			});
+		}
+
 		tips.push({
-			title: 'Isolamento termico',
-			description: "Migliora l'isolamento di pareti e infissi",
-			savings: 'Riduzione del 30% sui costi di riscaldamento',
+			title: 'Termostato intelligente',
+			description:
+				'Installa un termostato smart con programmazione settimanale',
+			savings: 'Ottimizzazione automatica fino al 20% dei consumi',
 			priority: 'media',
 		});
 
 		tips.push({
-			title: 'Gestione intelligente',
-			description: 'Installa termostati smart e sistemi di controllo',
-			savings: 'Ottimizzazione automatica dei consumi',
-			priority: 'media',
+			title: 'Pannelli solari',
+			description: "Valuta l'installazione di pannelli fotovoltaici sul tetto",
+			savings: 'Autoproduzione fino al 70% del fabbisogno elettrico',
+			priority: 'bassa',
 		});
 
 		return tips;
@@ -177,7 +208,7 @@ const CalculatorPage = () => {
 	const saveReport = async () => {
 		if (!results) return;
 
-		// Controlla i limiti prima di salvare
+		// Controlla il limite prima di salvare
 		if (!checkReportLimit()) {
 			return;
 		}
@@ -186,68 +217,66 @@ const CalculatorPage = () => {
 
 		try {
 			if (isAuthenticated) {
-				// Salva nel database tramite API
+				// Calcola CO2 se non presente
+				const co2Savings =
+					(parseFloat(formData.consumption) * 0.3 * 0.5) / 1000; // tonnellate
+
+				// Prepara i dati nel formato corretto
 				const reportData = {
 					title: `Report del ${new Date().toLocaleDateString('it-IT')}`,
-					// Form data
-					consumption: parseFloat(results.formData.consumption),
-					bill: parseFloat(results.formData.bill),
-					area: parseFloat(results.formData.area),
-					heatingType: results.formData.heatingType,
-					buildingType: results.formData.buildingType,
-					occupants: results.formData.occupants
-						? parseInt(results.formData.occupants)
-						: null,
-					usageTime: results.formData.usageTime,
-					// Results
-					efficiencyLevel: results.efficiencyLevel.level,
-					efficiencyScore: results.efficiencyLevel.score,
-					efficiencyColor: results.efficiencyLevel.color,
-					efficiencyFactor: results.efficiencyLevel.factor,
-					monthlySavings: results.savingsPotential.monthlySavings,
-					annualSavings: results.savingsPotential.annualSavings,
-					savingsPercentage: results.savingsPotential.percentage,
-					investment: results.investment,
-					roi: results.roi,
-					co2Savings: results.co2Savings,
-					recommendations: results.tips,
-				};
-
-				await reportsAPI.create(reportData);
-				alert('Report salvato con successo nel tuo account!');
-			} else {
-				// Salva localmente per utenti non autenticati
-				const report = {
-					id: Date.now(),
-					date: new Date().toISOString(),
-					formData: results.formData,
+					// Dati del form
+					data: {
+						consumption: formData?.consumption,
+						bill: formData?.bill,
+						area: formData?.area,
+						heatingType: formData?.heatingType || 'gas',
+						buildingType: formData?.buildingType || 'residenziale',
+						occupants: formData?.occupants || 1,
+					},
+					// Risultati calcolati
 					results: {
 						efficiencyLevel: results.efficiencyLevel,
+						efficiencyScore: results.efficiencyLevel?.score,
 						savingsPotential: results.savingsPotential,
 						investment: results.investment,
 						roi: results.roi,
-						co2Savings: results.co2Savings,
+						environmental: {
+							co2Savings: co2Savings.toFixed(2),
+							treesEquivalent: Math.round(co2Savings * 16),
+						},
 					},
+					// Usa tips come recommendations
+					recommendations: results.tips || [],
+					// Campi per query rapide
+					annualSavings: results.savingsPotential?.annualSavings || 0,
+					monthlySavings: results.savingsPotential?.monthlySavings || 0,
+					co2Savings: co2Savings || 0,
 				};
 
-				// Recupera report esistenti
-				const existingReports = StorageManager.getReports();
+				console.log('Sending report data:', reportData); // Debug
 
-				// Aggiungi nuovo report
-				const updatedReports = [...existingReports, report];
+				const response = await reportsAPI.create(reportData);
 
-				// Salva (con scadenza se non registrato)
-				StorageManager.saveReports(updatedReports);
-
-				alert(
-					'Report salvato localmente! Registrati per salvarlo permanentemente.'
-				);
+				if (response.data.report) {
+					alert('Report salvato con successo!');
+					navigate('/reports');
+				}
+			} else {
+				// Salvataggio locale per non autenticati
+				const localReport = {
+					...results,
+					id: `local-${Date.now()}`,
+					createdAt: new Date().toISOString(),
+					data: formData,
+					title: `Report del ${new Date().toLocaleDateString('it-IT')}`,
+				};
+				StorageManager.saveReport(localReport);
+				alert('Report salvato localmente (scadrà tra 24 ore)');
+				navigate('/reports');
 			}
-
-			navigate('/reports');
 		} catch (error) {
-			console.error('Error saving report:', error);
-			alert('Errore nel salvataggio del report. Riprova.');
+			console.error('Errore salvataggio report:', error);
+			alert('Errore nel salvataggio del report');
 		} finally {
 			setSaving(false);
 		}
