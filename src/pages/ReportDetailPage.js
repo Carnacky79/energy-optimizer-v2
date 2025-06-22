@@ -17,20 +17,21 @@ import {
 import {
 	LineChart,
 	Line,
+	PieChart,
+	Pie,
+	BarChart,
+	Bar,
 	XAxis,
 	YAxis,
 	CartesianGrid,
 	Tooltip,
 	Legend,
 	ResponsiveContainer,
-	BarChart,
-	Bar,
-	PieChart,
-	Pie,
 	Cell,
 } from 'recharts';
 import { reportsAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import ShareModal from '../components/ShareModal';
 
 const ReportDetailPage = () => {
 	const { id } = useParams();
@@ -38,6 +39,13 @@ const ReportDetailPage = () => {
 	const { isAuthenticated } = useAuth();
 	const [report, setReport] = useState(null);
 	const [loading, setLoading] = useState(true);
+	const [showShareModal, setShowShareModal] = useState(false);
+
+	// Helper function per estrarre valori numerici in modo sicuro
+	const getNumericValue = (value, defaultValue = 0) => {
+		const num = parseFloat(value);
+		return isNaN(num) ? defaultValue : num;
+	};
 
 	useEffect(() => {
 		const loadReport = async () => {
@@ -47,129 +55,33 @@ const ReportDetailPage = () => {
 					const response = await reportsAPI.getOne(id);
 					setReport(response.data.report);
 				} else {
-					// Carica dal sessionStorage o localStorage
-					const tempReport = sessionStorage.getItem('currentReport');
-					if (tempReport) {
-						setReport(JSON.parse(tempReport));
-					} else {
-						// Cerca nel localStorage
-						const localReports = JSON.parse(
-							localStorage.getItem('energy_optimizer_reports') || '[]'
-						);
-						const found = localReports.find((r) => r.id.toString() === id);
-						setReport(found);
-					}
+					// Carica dal sessionStorage per visualizzazione temporanea
+					const tempReport = JSON.parse(
+						sessionStorage.getItem('currentReport') || '{}'
+					);
+					setReport(tempReport);
 				}
 			} catch (error) {
-				console.error('Error loading report:', error);
+				console.error('Errore caricamento report:', error);
+				navigate('/reports');
 			} finally {
 				setLoading(false);
 			}
 		};
 
 		loadReport();
-	}, [id, isAuthenticated]);
-
-	if (loading) {
-		return (
-			<div
-				style={{
-					display: 'flex',
-					justifyContent: 'center',
-					alignItems: 'center',
-					height: '100vh',
-				}}
-			>
-				<div>Caricamento report...</div>
-			</div>
-		);
-	}
-
-	if (!report) {
-		return (
-			<div style={{ textAlign: 'center', padding: '4rem' }}>
-				<h2>Report non trovato</h2>
-				<button
-					onClick={() => navigate('/reports')}
-					style={{ marginTop: '1rem' }}
-				>
-					Torna ai report
-				</button>
-			</div>
-		);
-	}
-
-	// Prepara i dati per i grafici
-	const savingsData = [
-		{
-			month: 'Gen',
-			attuale: report.bill || report.formData?.bill || 100,
-			ottimizzato: (report.bill || report.formData?.bill || 100) * 0.7,
-		},
-		{
-			month: 'Feb',
-			attuale: (report.bill || report.formData?.bill || 100) * 0.95,
-			ottimizzato: (report.bill || report.formData?.bill || 100) * 0.95 * 0.7,
-		},
-		{
-			month: 'Mar',
-			attuale: (report.bill || report.formData?.bill || 100) * 0.9,
-			ottimizzato: (report.bill || report.formData?.bill || 100) * 0.9 * 0.7,
-		},
-		{
-			month: 'Apr',
-			attuale: (report.bill || report.formData?.bill || 100) * 1.1,
-			ottimizzato: (report.bill || report.formData?.bill || 100) * 1.1 * 0.7,
-		},
-		{
-			month: 'Mag',
-			attuale: (report.bill || report.formData?.bill || 100) * 1.2,
-			ottimizzato: (report.bill || report.formData?.bill || 100) * 1.2 * 0.7,
-		},
-		{
-			month: 'Giu',
-			attuale: (report.bill || report.formData?.bill || 100) * 1.3,
-			ottimizzato: (report.bill || report.formData?.bill || 100) * 1.3 * 0.7,
-		},
-	];
-
-	const consumptionBreakdown = [
-		{ name: 'Riscaldamento', value: 35, color: '#ef4444' },
-		{ name: 'Illuminazione', value: 25, color: '#3b82f6' },
-		{ name: 'Elettrodomestici', value: 20, color: '#10b981' },
-		{ name: 'Acqua calda', value: 15, color: '#f59e0b' },
-		{ name: 'Altro', value: 5, color: '#8b5cf6' },
-	];
-
-	const savingsBreakdown = [
-		{ categoria: 'Illuminazione', attuale: 50, risparmio: 70 },
-		{ categoria: 'Riscaldamento', attuale: 200, risparmio: 30 },
-		{ categoria: 'Elettrodomestici', attuale: 80, risparmio: 25 },
-		{ categoria: 'Acqua calda', attuale: 60, risparmio: 40 },
-		{ categoria: 'Standby', attuale: 20, risparmio: 90 },
-	];
-
-	// Estrai i dati del report
-	const efficiency =
-		report.efficiencyLevel || report.results?.efficiencyLevel?.level || 'N/D';
-	const annualSavings =
-		report.annualSavings ||
-		report.results?.savingsPotential?.annualSavings ||
-		0;
-	const monthlySavings =
-		report.monthlySavings ||
-		report.results?.savingsPotential?.monthlySavings ||
-		annualSavings / 12;
-	const roi = report.roi || report.results?.roi || 0;
-	const co2Savings = report.co2Savings || report.results?.co2Savings || 0;
+	}, [id, isAuthenticated, navigate]);
 
 	const styles = {
 		container: {
 			maxWidth: '1200px',
 			margin: '0 auto',
-			padding: '2rem 1rem',
+			padding: '2rem',
 		},
 		header: {
+			display: 'flex',
+			justifyContent: 'space-between',
+			alignItems: 'center',
 			marginBottom: '2rem',
 		},
 		backButton: {
@@ -177,17 +89,11 @@ const ReportDetailPage = () => {
 			alignItems: 'center',
 			gap: '0.5rem',
 			padding: '0.5rem 1rem',
-			backgroundColor: '#f3f4f6',
-			border: 'none',
+			border: '1px solid #d1d5db',
 			borderRadius: '0.375rem',
+			backgroundColor: 'white',
 			cursor: 'pointer',
-			marginBottom: '1rem',
-		},
-		titleSection: {
-			display: 'flex',
-			justifyContent: 'space-between',
-			alignItems: 'center',
-			marginBottom: '2rem',
+			fontSize: '0.875rem',
 		},
 		actions: {
 			display: 'flex',
@@ -198,17 +104,11 @@ const ReportDetailPage = () => {
 			alignItems: 'center',
 			gap: '0.5rem',
 			padding: '0.5rem 1rem',
-			backgroundColor: 'white',
-			border: '1px solid #e5e7eb',
+			border: '1px solid #d1d5db',
 			borderRadius: '0.375rem',
-			cursor: 'pointer',
-		},
-		section: {
 			backgroundColor: 'white',
-			borderRadius: '0.5rem',
-			boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-			padding: '2rem',
-			marginBottom: '2rem',
+			cursor: 'pointer',
+			fontSize: '0.875rem',
 		},
 		metricsGrid: {
 			display: 'grid',
@@ -217,178 +117,349 @@ const ReportDetailPage = () => {
 			marginBottom: '2rem',
 		},
 		metricCard: {
-			textAlign: 'center',
+			backgroundColor: 'white',
 			padding: '1.5rem',
-			backgroundColor: '#f9fafb',
 			borderRadius: '0.5rem',
-		},
-		chartGrid: {
-			display: 'grid',
-			gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-			gap: '2rem',
-		},
-		recommendation: {
+			boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
 			display: 'flex',
+			alignItems: 'center',
 			gap: '1rem',
-			padding: '1rem',
-			backgroundColor: '#f9fafb',
-			borderRadius: '0.5rem',
-			marginBottom: '1rem',
 		},
-		premiumBanner: {
-			background: 'linear-gradient(to right, #7c3aed, #2563eb)',
-			color: 'white',
-			padding: '2rem',
+		metricValue: {
+			fontSize: '1.875rem',
+			fontWeight: 'bold',
+			color: '#1f2937',
+		},
+		metricLabel: {
+			fontSize: '0.875rem',
+			color: '#6b7280',
+		},
+		section: {
+			backgroundColor: 'white',
+			padding: '1.5rem',
 			borderRadius: '0.5rem',
+			boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+			marginBottom: '1.5rem',
+		},
+		sectionTitle: {
+			fontSize: '1.125rem',
+			fontWeight: '600',
+			marginBottom: '1rem',
+			color: '#1f2937',
+		},
+		chartContainer: {
+			height: '300px',
+			marginTop: '1rem',
+		},
+		recommendationList: {
+			listStyle: 'none',
+			padding: 0,
+		},
+		recommendationItem: {
+			display: 'flex',
+			alignItems: 'flex-start',
+			gap: '0.75rem',
+			padding: '0.75rem',
+			marginBottom: '0.5rem',
+			backgroundColor: '#f9fafb',
+			borderRadius: '0.375rem',
+		},
+		priorityBadge: {
+			display: 'inline-block',
+			padding: '0.25rem 0.75rem',
+			borderRadius: '9999px',
+			fontSize: '0.75rem',
+			fontWeight: '500',
+		},
+		dataGrid: {
+			display: 'grid',
+			gridTemplateColumns: 'repeat(2, 1fr)',
+			gap: '1rem',
+		},
+		dataItem: {
+			display: 'flex',
+			justifyContent: 'space-between',
+			padding: '0.5rem 0',
+			borderBottom: '1px solid #e5e7eb',
+		},
+		dataLabel: {
+			color: '#6b7280',
+			fontSize: '0.875rem',
+		},
+		dataValue: {
+			fontWeight: '500',
+			color: '#1f2937',
+		},
+		upsellBanner: {
+			backgroundColor: '#fef3c7',
+			border: '1px solid #fcd34d',
+			borderRadius: '0.5rem',
+			padding: '1.5rem',
 			textAlign: 'center',
+			marginTop: '2rem',
+		},
+		upsellTitle: {
+			fontSize: '1.125rem',
+			fontWeight: '600',
+			marginBottom: '0.5rem',
+			color: '#92400e',
+		},
+		premiumButton: {
+			marginTop: '1rem',
+			padding: '0.75rem 2rem',
+			backgroundColor: '#f59e0b',
+			color: 'white',
+			border: 'none',
+			borderRadius: '0.375rem',
+			fontWeight: '500',
+			cursor: 'pointer',
 		},
 	};
 
-	const getIcon = (title) => {
-		if (title?.includes('Illuminazione')) return <Lightbulb size={24} />;
-		if (title?.includes('Isolamento')) return <Home size={24} />;
-		if (title?.includes('Gestione')) return <Shield size={24} />;
-		return <TrendingDown size={24} />;
+	if (loading) {
+		return (
+			<div style={styles.container}>
+				<div style={{ textAlign: 'center', padding: '4rem' }}>
+					<div className='spinner' />
+					<p style={{ marginTop: '1rem', color: '#6b7280' }}>
+						Caricamento report...
+					</p>
+				</div>
+			</div>
+		);
+	}
+
+	if (!report) {
+		return (
+			<div style={styles.container}>
+				<div style={{ textAlign: 'center', padding: '4rem' }}>
+					<p style={{ marginBottom: '1rem', color: '#6b7280' }}>
+						Report non trovato
+					</p>
+					<button
+						onClick={() => navigate('/reports')}
+						style={styles.backButton}
+					>
+						Torna ai report
+					</button>
+				</div>
+			</div>
+		);
+	}
+
+	// Estrai i valori in modo sicuro
+	const annualSavings = getNumericValue(
+		report?.annualSavings ||
+			report?.results?.savingsPotential?.annualSavings ||
+			report?.results?.annualSavings
+	);
+
+	const monthlySavings = getNumericValue(
+		report?.monthlySavings ||
+			report?.results?.savingsPotential?.monthlySavings ||
+			report?.results?.monthlySavings ||
+			annualSavings / 12
+	);
+
+	const currentBill = getNumericValue(
+		report?.data?.bill || report?.data?.currentBill || 100
+	);
+
+	const consumption = getNumericValue(
+		report?.data?.consumption || report?.data?.monthlyConsumption || 300
+	);
+
+	const co2Savings = getNumericValue(
+		report?.co2Savings ||
+			report?.results?.environmental?.co2Savings ||
+			report?.results?.co2Saved ||
+			0
+	);
+
+	const efficiencyLevel = report?.results?.efficiencyLevel || 'C';
+	const recommendations =
+		report?.recommendations || report?.results?.recommendations || [];
+
+	// Dati per i grafici
+	const monthlyData = [
+		{
+			month: 'Gen',
+			attuale: currentBill,
+			ottimizzato: currentBill - monthlySavings,
+		},
+		{
+			month: 'Feb',
+			attuale: currentBill,
+			ottimizzato: currentBill - monthlySavings,
+		},
+		{
+			month: 'Mar',
+			attuale: currentBill,
+			ottimizzato: currentBill - monthlySavings,
+		},
+		{
+			month: 'Apr',
+			attuale: currentBill,
+			ottimizzato: currentBill - monthlySavings,
+		},
+		{
+			month: 'Mag',
+			attuale: currentBill,
+			ottimizzato: currentBill - monthlySavings,
+		},
+		{
+			month: 'Giu',
+			attuale: currentBill,
+			ottimizzato: currentBill - monthlySavings,
+		},
+	];
+
+	const consumptionData = [
+		{ name: 'Illuminazione', value: consumption * 0.15 },
+		{ name: 'Riscaldamento', value: consumption * 0.35 },
+		{ name: 'Elettrodomestici', value: consumption * 0.3 },
+		{ name: 'Acqua calda', value: consumption * 0.2 },
+	];
+
+	const savingsData = [
+		{ category: 'Illuminazione', risparmio: monthlySavings * 0.25 },
+		{ category: 'Riscaldamento', risparmio: monthlySavings * 0.4 },
+		{ category: 'Elettrodomestici', risparmio: monthlySavings * 0.2 },
+		{ category: 'Comportamento', risparmio: monthlySavings * 0.15 },
+	];
+
+	const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+
+	const priorityColors = {
+		Alta: { bg: '#fee2e2', color: '#dc2626' },
+		Media: { bg: '#fed7aa', color: '#ea580c' },
+		Bassa: { bg: '#d1fae5', color: '#059669' },
+	};
+
+	const renderRecommendation = (rec) => {
+		// Se è una stringa, restituiscila direttamente
+		if (typeof rec === 'string') {
+			return rec;
+		}
+
+		// Se è un oggetto, estrai il testo principale
+		if (typeof rec === 'object' && rec !== null) {
+			return rec.title || rec.action || rec.description || JSON.stringify(rec);
+		}
+
+		// Fallback
+		return 'Raccomandazione';
 	};
 
 	return (
 		<div style={styles.container}>
+			{/* Header */}
 			<div style={styles.header}>
-				<button style={styles.backButton} onClick={() => navigate('/reports')}>
+				<button onClick={() => navigate('/reports')} style={styles.backButton}>
 					<ArrowLeft size={20} />
 					Torna ai report
 				</button>
-
-				<div style={styles.titleSection}>
-					<div>
-						<h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
-							{report.title ||
-								`Report del ${new Date(
-									report.createdAt || report.date
-								).toLocaleDateString('it-IT')}`}
-						</h1>
-						<p style={{ color: '#6b7280' }}>
-							Creato il{' '}
-							{new Date(report.createdAt || report.date).toLocaleString(
-								'it-IT'
-							)}
-						</p>
-					</div>
-					<div style={styles.actions}>
-						<button style={styles.actionButton} onClick={() => window.print()}>
-							<Printer size={20} />
-							Stampa
-						</button>
+				<div style={styles.actions}>
+					<button style={styles.actionButton} onClick={() => window.print()}>
+						<Printer size={20} />
+						Stampa
+					</button>
+					<button
+						style={styles.actionButton}
+						onClick={() => setShowShareModal(true)}
+					>
+						<Share2 size={20} />
+						Condividi
+					</button>
+					{isAuthenticated ? (
 						<button
-							style={styles.actionButton}
-							onClick={() => alert('Funzione disponibile per utenti Premium')}
+							style={{
+								...styles.actionButton,
+								backgroundColor: '#3b82f6',
+								color: 'white',
+							}}
+							onClick={() => alert('Generazione PDF disponibile a breve')}
 						>
 							<Download size={20} />
-							PDF
+							Scarica PDF
 						</button>
+					) : (
 						<button
-							style={styles.actionButton}
-							onClick={() => alert('Funzione disponibile a breve')}
+							style={{
+								...styles.actionButton,
+								backgroundColor: '#f59e0b',
+								color: 'white',
+							}}
+							onClick={() => navigate('/register')}
 						>
-							<Share2 size={20} />
-							Condividi
+							<Shield size={20} />
+							Registrati per PDF
 						</button>
-					</div>
+					)}
 				</div>
 			</div>
 
-			{/* Riepilogo Principale */}
-			<div style={styles.section}>
-				<h2 style={{ marginBottom: '1.5rem' }}>Riepilogo Analisi Energetica</h2>
+			{/* Titolo Report */}
+			<h1
+				style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem' }}
+			>
+				{report.title ||
+					`Report del ${new Date(report.createdAt).toLocaleDateString(
+						'it-IT'
+					)}`}
+			</h1>
 
-				<div style={styles.metricsGrid}>
-					<div style={styles.metricCard}>
-						<h3 style={{ color: '#6b7280', marginBottom: '0.5rem' }}>
-							Efficienza Energetica
-						</h3>
-						<p
-							style={{
-								fontSize: '2.5rem',
-								fontWeight: 'bold',
-								color: '#059669',
-							}}
-						>
-							{efficiency}
-						</p>
+			{/* Metriche principali */}
+			<div style={styles.metricsGrid}>
+				<div style={styles.metricCard}>
+					<PiggyBank size={32} color='#10b981' />
+					<div>
+						<div style={styles.metricValue}>€{annualSavings.toFixed(0)}</div>
+						<div style={styles.metricLabel}>Risparmio Annuale</div>
 					</div>
-					<div style={styles.metricCard}>
-						<PiggyBank
-							size={48}
-							color='#10b981'
-							style={{ marginBottom: '0.5rem' }}
-						/>
-						<h3 style={{ color: '#6b7280', marginBottom: '0.5rem' }}>
-							Risparmio Annuale
-						</h3>
-						<p
-							style={{
-								fontSize: '2.5rem',
-								fontWeight: 'bold',
-								color: '#10b981',
-							}}
-						>
-							€{annualSavings.toFixed(0)}
-						</p>
-						<p style={{ color: '#6b7280' }}>
+				</div>
+
+				<div style={styles.metricCard}>
+					<TrendingDown size={32} color='#3b82f6' />
+					<div>
+						<div style={styles.metricValue}>
 							€{monthlySavings.toFixed(0)}/mese
-						</p>
+						</div>
+						<div style={styles.metricLabel}>Risparmio Mensile</div>
 					</div>
-					<div style={styles.metricCard}>
-						<TrendingDown
-							size={48}
-							color='#2563eb'
-							style={{ marginBottom: '0.5rem' }}
-						/>
-						<h3 style={{ color: '#6b7280', marginBottom: '0.5rem' }}>
-							ROI Stimato
-						</h3>
-						<p
-							style={{
-								fontSize: '2.5rem',
-								fontWeight: 'bold',
-								color: '#2563eb',
-							}}
-						>
-							{roi.toFixed(1)} anni
-						</p>
+				</div>
+
+				<div style={styles.metricCard}>
+					<Leaf size={32} color='#10b981' />
+					<div>
+						<div style={styles.metricValue}>{co2Savings.toFixed(2)} ton</div>
+						<div style={styles.metricLabel}>CO2 Risparmiata</div>
 					</div>
-					<div style={styles.metricCard}>
-						<Leaf
-							size={48}
-							color='#10b981'
-							style={{ marginBottom: '0.5rem' }}
-						/>
-						<h3 style={{ color: '#6b7280', marginBottom: '0.5rem' }}>
-							CO2 Risparmiata
-						</h3>
-						<p
-							style={{
-								fontSize: '2.5rem',
-								fontWeight: 'bold',
-								color: '#10b981',
-							}}
-						>
-							{(co2Savings / 1000).toFixed(1)} ton
-						</p>
-						<p style={{ color: '#6b7280' }}>all'anno</p>
+				</div>
+
+				<div style={styles.metricCard}>
+					<Home size={32} color='#f59e0b' />
+					<div>
+						<div style={styles.metricValue}>Classe {efficiencyLevel}</div>
+						<div style={styles.metricLabel}>Efficienza Energetica</div>
 					</div>
 				</div>
 			</div>
 
 			{/* Grafici */}
-			<div style={styles.section}>
-				<h2 style={{ marginBottom: '1.5rem' }}>Analisi Dettagliata</h2>
-
-				<div style={styles.chartGrid}>
-					<div>
-						<h3 style={{ marginBottom: '1rem' }}>Proiezione Spesa Mensile</h3>
-						<ResponsiveContainer width='100%' height={300}>
-							<LineChart data={savingsData}>
+			<div
+				style={{
+					display: 'grid',
+					gridTemplateColumns: '2fr 1fr',
+					gap: '1.5rem',
+				}}
+			>
+				{/* Proiezione spesa mensile */}
+				<div style={styles.section}>
+					<h3 style={styles.sectionTitle}>📊 Proiezione Spesa Mensile</h3>
+					<div style={styles.chartContainer}>
+						<ResponsiveContainer width='100%' height='100%'>
+							<LineChart data={monthlyData}>
 								<CartesianGrid strokeDasharray='3 3' />
 								<XAxis dataKey='month' />
 								<YAxis />
@@ -399,225 +470,230 @@ const ReportDetailPage = () => {
 									dataKey='attuale'
 									stroke='#ef4444'
 									name='Spesa Attuale'
-									strokeWidth={2}
 								/>
 								<Line
 									type='monotone'
 									dataKey='ottimizzato'
 									stroke='#10b981'
 									name='Spesa Ottimizzata'
-									strokeWidth={2}
 								/>
 							</LineChart>
 						</ResponsiveContainer>
 					</div>
+				</div>
 
-					<div>
-						<h3 style={{ marginBottom: '1rem' }}>Distribuzione Consumi</h3>
-						<ResponsiveContainer width='100%' height={300}>
+				{/* Distribuzione consumi */}
+				<div style={styles.section}>
+					<h3 style={styles.sectionTitle}>🥧 Distribuzione Consumi</h3>
+					<div style={styles.chartContainer}>
+						<ResponsiveContainer width='100%' height='100%'>
 							<PieChart>
 								<Pie
-									data={consumptionBreakdown}
+									data={consumptionData}
 									cx='50%'
 									cy='50%'
 									labelLine={false}
-									label={(entry) => `${entry.name} ${entry.value}%`}
+									label={({ name, percent }) =>
+										`${name} ${(percent * 100).toFixed(0)}%`
+									}
 									outerRadius={80}
 									fill='#8884d8'
 									dataKey='value'
 								>
-									{consumptionBreakdown.map((entry, index) => (
-										<Cell key={`cell-${index}`} fill={entry.color} />
+									{consumptionData.map((entry, index) => (
+										<Cell
+											key={`cell-${index}`}
+											fill={COLORS[index % COLORS.length]}
+										/>
 									))}
 								</Pie>
-								<Tooltip />
+								<Tooltip formatter={(value) => `${value.toFixed(0)} kWh`} />
 							</PieChart>
 						</ResponsiveContainer>
 					</div>
 				</div>
+			</div>
 
-				<div style={{ marginTop: '2rem' }}>
-					<h3 style={{ marginBottom: '1rem' }}>
-						Potenziale di Risparmio per Categoria
-					</h3>
-					<ResponsiveContainer width='100%' height={300}>
-						<BarChart data={savingsBreakdown}>
+			{/* Potenziale risparmio per categoria */}
+			<div style={styles.section}>
+				<h3 style={styles.sectionTitle}>
+					💰 Potenziale Risparmio per Categoria
+				</h3>
+				<div style={styles.chartContainer}>
+					<ResponsiveContainer width='100%' height='100%'>
+						<BarChart data={savingsData}>
 							<CartesianGrid strokeDasharray='3 3' />
-							<XAxis dataKey='categoria' />
+							<XAxis dataKey='category' />
 							<YAxis />
-							<Tooltip />
-							<Legend />
-							<Bar
-								dataKey='attuale'
-								fill='#ef4444'
-								name='Consumo Attuale (€)'
-							/>
-							<Bar dataKey='risparmio' fill='#10b981' name='Risparmio (%)' />
+							<Tooltip formatter={(value) => `€${value.toFixed(0)}`} />
+							<Bar dataKey='risparmio' fill='#10b981' />
 						</BarChart>
 					</ResponsiveContainer>
 				</div>
 			</div>
 
-			{/* Raccomandazioni */}
+			{/* Piano d'azione consigliato */}
 			<div style={styles.section}>
-				<h2 style={{ marginBottom: '1.5rem' }}>Piano d'Azione Consigliato</h2>
+				<h3 style={styles.sectionTitle}>📋 Piano d'Azione Consigliato</h3>
+				<ul style={styles.recommendationList}>
+					{recommendations.length > 0 ? (
+						recommendations.map((rec, index) => {
+							const priority = typeof rec === 'object' ? rec.priority : null;
+							const savings = typeof rec === 'object' ? rec.savings : null;
 
-				{(
-					report.recommendations ||
-					report.results?.tips || [
-						{
-							title: 'Illuminazione LED',
-							description:
-								'Sostituisci tutte le lampade con LED ad alta efficienza',
-							savings: 'Fino al 80% sui consumi',
-							priority: 'alta',
-						},
-						{
-							title: 'Isolamento termico',
-							description: "Migliora l'isolamento di pareti e infissi",
-							savings: 'Riduzione del 30% sui costi',
-							priority: 'media',
-						},
-						{
-							title: 'Gestione intelligente',
-							description: 'Installa termostati smart',
-							savings: 'Ottimizzazione automatica',
-							priority: 'media',
-						},
-					]
-				).map((rec, index) => (
-					<div key={index} style={styles.recommendation}>
-						<div
-							style={{
-								padding: '0.5rem',
-								backgroundColor:
-									rec.priority === 'alta' ? '#fee2e2' : '#f0fdf4',
-								borderRadius: '0.5rem',
-								height: 'fit-content',
-							}}
-						>
-							{getIcon(rec.title)}
-						</div>
-						<div style={{ flex: 1 }}>
-							<h4 style={{ marginBottom: '0.5rem' }}>{rec.title}</h4>
-							<p style={{ color: '#6b7280', marginBottom: '0.25rem' }}>
-								{rec.description}
-							</p>
-							<p style={{ color: '#059669', fontWeight: 'bold' }}>
-								{rec.savings}
-							</p>
-						</div>
-						<div
-							style={{
-								padding: '0.25rem 0.75rem',
-								backgroundColor:
-									rec.priority === 'alta' ? '#dc2626' : '#f59e0b',
-								color: 'white',
-								borderRadius: '0.25rem',
-								fontSize: '0.875rem',
-								height: 'fit-content',
-							}}
-						>
-							Priorità {rec.priority || 'media'}
-						</div>
-					</div>
-				))}
+							return (
+								<li key={index} style={styles.recommendationItem}>
+									<Lightbulb size={20} color='#f59e0b' />
+									<div style={{ flex: 1 }}>
+										<div style={{ marginBottom: '0.25rem' }}>
+											{renderRecommendation(rec)}
+										</div>
+										<div
+											style={{
+												display: 'flex',
+												gap: '0.5rem',
+												alignItems: 'center',
+											}}
+										>
+											{priority && (
+												<span
+													style={{
+														...styles.priorityBadge,
+														backgroundColor:
+															priorityColors[priority]?.bg || '#f3f4f6',
+														color: priorityColors[priority]?.color || '#6b7280',
+													}}
+												>
+													Priorità {priority}
+												</span>
+											)}
+											{savings && (
+												<span
+													style={{ fontSize: '0.875rem', color: '#10b981' }}
+												>
+													Risparmio: €{savings}/anno
+												</span>
+											)}
+										</div>
+									</div>
+								</li>
+							);
+						})
+					) : (
+						// Raccomandazioni di default...
+						<>
+							<li style={styles.recommendationItem}>
+								<Lightbulb size={20} color='#f59e0b' />
+								<div style={{ flex: 1 }}>
+									<div style={{ marginBottom: '0.25rem' }}>
+										Sostituisci le lampadine con LED
+									</div>
+									<span
+										style={{
+											...styles.priorityBadge,
+											backgroundColor: '#fee2e2',
+											color: '#dc2626',
+										}}
+									>
+										Priorità Alta
+									</span>
+								</div>
+							</li>
+							<li style={styles.recommendationItem}>
+								<Lightbulb size={20} color='#f59e0b' />
+								<div style={{ flex: 1 }}>
+									<div style={{ marginBottom: '0.25rem' }}>
+										Installa un termostato programmabile
+									</div>
+									<span
+										style={{
+											...styles.priorityBadge,
+											backgroundColor: '#fee2e2',
+											color: '#dc2626',
+										}}
+									>
+										Priorità Alta
+									</span>
+								</div>
+							</li>
+							<li style={styles.recommendationItem}>
+								<Lightbulb size={20} color='#f59e0b' />
+								<div style={{ flex: 1 }}>
+									<div style={{ marginBottom: '0.25rem' }}>
+										Migliora l'isolamento termico
+									</div>
+									<span
+										style={{
+											...styles.priorityBadge,
+											backgroundColor: '#fed7aa',
+											color: '#ea580c',
+										}}
+									>
+										Priorità Media
+									</span>
+								</div>
+							</li>
+						</>
+					)}
+				</ul>
 			</div>
 
-			{/* Dati Tecnici */}
+			{/* Dati tecnici */}
 			<div style={styles.section}>
-				<h2 style={{ marginBottom: '1.5rem' }}>Dati Tecnici</h2>
-
-				<div
-					style={{
-						display: 'grid',
-						gridTemplateColumns: 'repeat(2, 1fr)',
-						gap: '1rem',
-					}}
-				>
-					<div>
-						<h4 style={{ color: '#6b7280', marginBottom: '0.5rem' }}>
-							Informazioni Edificio
-						</h4>
-						<p>
-							Superficie:{' '}
-							<strong>{report.area || report.formData?.area} m²</strong>
-						</p>
-						<p>
-							Tipo:{' '}
-							<strong>
-								{report.buildingType || report.formData?.buildingType}
-							</strong>
-						</p>
-						<p>
-							Riscaldamento:{' '}
-							<strong>
-								{report.heatingType || report.formData?.heatingType}
-							</strong>
-						</p>
-						{(report.occupants || report.formData?.occupants) && (
-							<p>
-								Occupanti:{' '}
-								<strong>
-									{report.occupants || report.formData?.occupants}
-								</strong>
-							</p>
-						)}
+				<h3 style={styles.sectionTitle}>🔧 Dati Tecnici dell'Analisi</h3>
+				<div style={styles.dataGrid}>
+					<div style={styles.dataItem}>
+						<span style={styles.dataLabel}>Consumo mensile</span>
+						<span style={styles.dataValue}>{consumption} kWh</span>
 					</div>
-					<div>
-						<h4 style={{ color: '#6b7280', marginBottom: '0.5rem' }}>
-							Consumi Attuali
-						</h4>
-						<p>
-							Consumo mensile:{' '}
-							<strong>
-								{report.consumption || report.formData?.consumption} kWh
-							</strong>
-						</p>
-						<p>
-							Spesa mensile:{' '}
-							<strong>€{report.bill || report.formData?.bill}</strong>
-						</p>
-						<p>
-							Consumo per m²:{' '}
-							<strong>
-								{(
-									(report.consumption || report.formData?.consumption) /
-									(report.area || report.formData?.area)
-								).toFixed(1)}{' '}
-								kWh/m²
-							</strong>
-						</p>
+					<div style={styles.dataItem}>
+						<span style={styles.dataLabel}>Spesa mensile attuale</span>
+						<span style={styles.dataValue}>€{currentBill}</span>
+					</div>
+					<div style={styles.dataItem}>
+						<span style={styles.dataLabel}>Efficienza stimata</span>
+						<span style={styles.dataValue}>
+							{Math.round((1 - monthlySavings / currentBill) * 100)}%
+						</span>
+					</div>
+					<div style={styles.dataItem}>
+						<span style={styles.dataLabel}>ROI stimato</span>
+						<span style={styles.dataValue}>
+							{((annualSavings / 1000) * 100).toFixed(0)}%
+						</span>
 					</div>
 				</div>
 			</div>
 
-			{/* Premium Upsell */}
+			{/* Upsell per non registrati */}
 			{!isAuthenticated && (
-				<div style={styles.premiumBanner}>
-					<h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>
-						🚀 Sblocca l'Analisi Completa Premium
-					</h2>
-					<p style={{ fontSize: '1.125rem', marginBottom: '1.5rem' }}>
-						Ottieni un piano dettagliato personalizzato con oltre 50 consigli
-						specifici per la tua situazione
-					</p>
-					<button
-						onClick={() => navigate('/pricing')}
+				<div style={styles.upsellBanner}>
+					<h3 style={styles.upsellTitle}>🚀 Sblocca il Potenziale Completo!</h3>
+					<p>Registrati per ottenere:</p>
+					<ul
 						style={{
-							padding: '1rem 2rem',
-							backgroundColor: 'white',
-							color: '#7c3aed',
-							border: 'none',
-							borderRadius: '0.5rem',
-							fontSize: '1.125rem',
-							fontWeight: 'bold',
-							cursor: 'pointer',
+							marginTop: '0.5rem',
+							textAlign: 'left',
+							display: 'inline-block',
 						}}
 					>
-						Passa a Premium →
+						<li>✅ Report PDF scaricabili</li>
+						<li>✅ Consulenza personalizzata</li>
+						<li>✅ Monitoraggio continuo dei risparmi</li>
+						<li>✅ Accesso a fornitori certificati</li>
+					</ul>
+					<button
+						onClick={() => navigate('/register')}
+						style={styles.premiumButton}
+					>
+						Registrati Gratis
 					</button>
 				</div>
+			)}
+
+			{/* Share Modal */}
+			{showShareModal && (
+				<ShareModal report={report} onClose={() => setShowShareModal(false)} />
 			)}
 		</div>
 	);

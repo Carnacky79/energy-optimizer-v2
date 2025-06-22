@@ -13,7 +13,10 @@ import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import PricingPage from './pages/PricingPage';
 import ReportDetailPage from './pages/ReportDetailPage';
+import SharedLandingPage from './pages/SharedLandingPage';
 import StorageManager from './utils/storage';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import AdminRoute from './components/AdminRoute';
 
 const styles = {
 	app: {
@@ -55,6 +58,7 @@ function App() {
 							<Route path='/pricing' element={<PricingPage />} />
 							<Route path='/reports' element={<ReportsPage />} />
 							<Route path='/report/:id' element={<ReportDetailPage />} />
+							<Route path='/shared/:shareId' element={<SharedLandingPage />} />
 
 							{/* Protected routes */}
 							<Route
@@ -63,6 +67,14 @@ function App() {
 									<ProtectedRoute>
 										<ProfilePage />
 									</ProtectedRoute>
+								}
+							/>
+							<Route
+								path='/admin'
+								element={
+									<AdminRoute>
+										<SuperAdminDashboard />
+									</AdminRoute>
 								}
 							/>
 						</Routes>

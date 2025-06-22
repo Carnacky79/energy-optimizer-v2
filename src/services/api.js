@@ -64,4 +64,21 @@ export const usersAPI = {
 	getSubscription: () => api.get('/users/subscription'),
 };
 
+// Analytics API
+export const analyticsAPI = {
+	trackShare: (data) => api.post('/analytics/share', data),
+	trackClick: (shareId, data) => api.post(`/analytics/click/${shareId}`, data),
+	trackConversion: (data) => api.post('/analytics/conversion', data),
+	getUserAnalytics: (params) => api.get('/analytics/user', { params }),
+};
+
+// Admin API
+export const adminAPI = {
+	getGlobalAnalytics: (params) => api.get('/admin/analytics', { params }),
+	getAllUsers: (params) => api.get('/admin/users', { params }),
+	getUser: (userId) => api.get(`/admin/users/${userId}`),
+	updateUser: (userId, data) => api.put(`/admin/users/${userId}`, data),
+	deleteUser: (userId) => api.delete(`/admin/users/${userId}`),
+};
+
 export default api;

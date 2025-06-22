@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Leaf, Clock, AlertCircle, User, LogOut } from 'lucide-react';
+import { Leaf, Clock, AlertCircle, User, LogOut, Shield } from 'lucide-react';
 import StorageManager from '../../utils/storage';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -281,6 +281,24 @@ const Header = () => {
 									>
 										Registrati
 									</Link>
+									{user?.role === 'superadmin' && (
+										<Link
+											to='/admin'
+											style={{
+												display: 'block',
+												padding: '0.75rem 1rem',
+												textDecoration: 'none',
+												color: '#1f2937',
+												backgroundColor: '#fee2e2',
+											}}
+										>
+											<Shield
+												size={16}
+												style={{ display: 'inline', marginRight: '0.5rem' }}
+											/>
+											Super Admin
+										</Link>
+									)}
 								</div>
 							)}
 						</div>

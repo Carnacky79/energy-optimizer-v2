@@ -38,18 +38,20 @@ const User = sequelize.define(
 			},
 		},
 		role: {
-			type: DataTypes.ENUM('user', 'premium', 'admin', 'consultant'),
+			type: DataTypes.ENUM('user', 'admin', 'superadmin'),
 			defaultValue: 'user',
 		},
-		subscriptionPlan: {
-			type: DataTypes.ENUM('free', 'basic', 'premium', 'business'),
+		subscriptionType: {
+			type: DataTypes.ENUM('free', 'premium'),
 			defaultValue: 'free',
 		},
-		subscriptionStartDate: {
-			type: DataTypes.DATE,
+		subscriptionPlan: {
+			type: DataTypes.ENUM('monthly', 'yearly'),
+			allowNull: true,
 		},
-		subscriptionEndDate: {
+		subscriptionExpiry: {
 			type: DataTypes.DATE,
+			allowNull: true,
 		},
 		subscriptionAutoRenew: {
 			type: DataTypes.BOOLEAN,
@@ -106,6 +108,14 @@ const User = sequelize.define(
 		},
 		co2Saved: {
 			type: DataTypes.DECIMAL(10, 2),
+			defaultValue: 0,
+		},
+		totalShares: {
+			type: DataTypes.INTEGER,
+			defaultValue: 0,
+		},
+		bonusMonths: {
+			type: DataTypes.INTEGER,
 			defaultValue: 0,
 		},
 		// Status
